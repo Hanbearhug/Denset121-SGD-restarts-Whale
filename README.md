@@ -61,3 +61,21 @@ class RandomLighting(Transform):
         x = lighting(x, b, c)
         return x
 ```
+这个类用于数据增强中的明暗度调节，在父类中定义了一个全局变量，用于保存各线程中的特定变量，这里应该是后面需要用多线程处理图像，为了避免对每一个图像做的处理相同。
+```
+def get_data(sz, batch_size):
+    """
+    Read data and do augmentations
+    """
+    aug_tfms = [RandomRotateZoom(deg=20, zoom=2, stretch=1),
+                RandomLighting(0.2, 0.2, tfm_y=TfmType.NO),
+                RandomBlur(blur_strengths=3,tfm_y=TfmType.NO),
+                RandomFlip(tfm_y=TfmType.NO)]
+    tfms = tfms_from_model(arch, sz, crop_type=CropType.NO, tfm_y=TfmType.NO,
+                           aug_tfms=aug_tfms)
+    ds = ImageData.get_ds(HWIDataset, (tr_n[:-(len(tr_n) % batch_size)], TRAIN),
+                          (val_n, TRAIN), tfms, test=(test_names, TEST))
+    md = ImageData("./", ds, batch_size, num_workers=num_workers, classes=None)
+    return md
+```
+这里定义了四种数据增强的操作，第一种包括旋转，放大，拉伸，三个变量分别代表最大的幅度，第二种是调节明暗度，第三种模糊度，第四种随机翻转
