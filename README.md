@@ -79,3 +79,36 @@ def get_data(sz, batch_size):
     return md
 ```
 这里定义了四种数据增强的操作，第一种包括旋转，放大，拉伸，三个变量分别代表最大的幅度，第二种是调节明暗度，第三种模糊度，第四种随机翻转
+
+```
+image_size = 224
+batch_size = 64
+md = get_data(image_size, batch_size)
+extra_fc_layers_size = []
+learn = ConvLearner.pretrained(arch, md, xtra_fc=extra_fc_layers_size) 
+learn.opt_fn = optim.Adam
+```
+这里设定图片大小为（224，224），extra_fc_layers代表的是在经典架构的顶层设置的输出结构，由于至少需要一层来将前面网络的输出转化成已知的输出，因此当设置xtra_fc为空集时，其代表的是通过一层将前面网络的输出转化为类别维度的输出。
+
+```
+base_lr = 5e-4 # lr for the backbone
+fc_lr = 1e-3 # lr for the classifer
+
+lrs = [base_lr, base_lr, fc_lr]
+# Freeze backbone and train the classifier for 2 epochs
+learn.fit(lrs=lrs, n_cycle=2, cycle_len=None)
+
+# Unfreeze backbone and continue training for 9 epochs
+learn.unfreeze()
+learn.fit(lrs, n_cycle=3, cycle_len=1, cycle_mult=2)
+learn.save('weights')
+```
+这里的学习率由find_lr找到，此kernel中直接对网络的前面结构进行unfreeze然后进行fine tuning、实际上这不是一个好的做法，因为最后一层由我们人为在顶端加上的层，其权重是随机生成的，而前面的网络权重则已经相对训练的较好了，混合的这样训练并不是一个好的事情。\
+
+在训练中发现train loss要显著大于valid loss，这是由于在实际的计算过程中训练过程采取了drop out操作，而相应的valid过程则没有，一般而言我们只有可能将drop out比率上调。
+
+```
+best_th = 0.38
+preds_t,y_t = learn.TTA(is_test=True,n_aug=8)
+```
+由于在图片的resize过程中一般是center crop的方式，因此在预测的时候通过对预测的图片进行随机的数据增强来提高模型的表现。
